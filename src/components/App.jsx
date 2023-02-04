@@ -1,92 +1,79 @@
-import { Component } from 'react';
+import { useState } from 'react';
 import css from './App.module.css';
-import axios from 'axios';
 
 import { Loader } from './Loader/Loader';
 import { fetchPicturesByTopic } from '../services/api';
-import Searchbar from './Searchbar/Searchbar';
+import { Searchbar } from './Searchbar/Searchbar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
 import { Button } from './Button/Button';
 import { Modal } from './Modal/Modal';
 
-axios.defaults.baseURL = 'https://pixabay.com/api/';
+export const App = () => {
+  const [pictures, setPictures] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [queryInput, setQueryInput] = useState('');
+  const [page, setPage] = useState(1);
+  const [modalShown, setModalShown] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [lastPage, setLastPage] = useState(1);
 
-export class App extends Component {
-  state = {
-    pictures: [],
-    isLoading: false,
-    error: null,
-    query: '',
-    page: 1,
-    showModal: false,
-    largeImageURL: '',
-    lastPage: 1,
-  };
+  const getPicturesFromApi = async (searchedQuery, page) => {
+    setIsLoading(true);
+    setError(null);
 
-  getPicturesFromApi = async searchedQuery => {
-    this.setState({ isLoading: true, error: null });
-    if (this.state.query !== '') {
+    if (queryInput !== '') {
       try {
-        const response = await fetchPicturesByTopic(
-          searchedQuery,
-          this.state.page
-        );
-        this.setState(prevState => ({
-          pictures: [...prevState.pictures, ...response.hits],
-          lastPage: Math.ceil(response.totalHits / 12),
-        }));
+        const response = await fetchPicturesByTopic(searchedQuery, page);
+        setPictures(prevState => [...prevState, ...response.hits]);
+        setLastPage(Math.ceil(response.totalHits / 12));
       } catch (error) {
-        this.setState({ error });
+        setError(error);
       } finally {
-        this.setState({ isLoading: false });
+        setIsLoading(false);
       }
     }
   };
 
-  handleSubmit = query => {
-    if (query !== this.state.query) {
-      this.setState({ query, pictures: [], page: 1 }, () => {
-        this.getPicturesFromApi(query);
-      });
+  const handleSubmit = query => {
+    if (queryInput !== '') {
+      setQueryInput(query);
+      setPictures([]);
+      setPage(1);
+      getPicturesFromApi(query);
     }
   };
 
-  loadMore = () => {
-    this.setState({ page: this.state.page + 1 }, () => {
-      this.getPicturesFromApi(this.state.query);
-    });
+  const loadMore = () => {
+    setPage(page + 1);
+    getPicturesFromApi(queryInput, page + 1);
   };
 
-  showModal = largeImageURL => {
-    this.setState({ showModal: true, largeImageURL: largeImageURL });
+  const showModal = largeImageURL => {
+    setModalShown(true);
+    setLargeImageURL(largeImageURL);
   };
 
-  closeModal = () => {
-    this.setState({ showModal: false, largeImageURL: '' });
+  const closeModal = () => {
+    setModalShown(false);
+    setLargeImageURL('');
   };
 
-  render() {
-    return (
-      <div className={css.app}>
-        <Searchbar onSubmit={this.handleSubmit} />
-        {this.state.isLoading && <Loader />}
-        {this.state.pictures.lengt}
-        <ImageGallery
-          images={this.state.pictures}
-          imageClick={this.showModal}
-        />
+  return (
+    <div className={css.app}>
+      <Searchbar
+        onSubmit={handleSubmit}
+        query={queryInput}
+        setQueryInput={setQueryInput}
+      />
+      {isLoading && <Loader />}
+      {pictures.lengt}
+      <ImageGallery images={pictures} imageClick={showModal} />
 
-        {this.state.pictures.length > 0 &&
-        this.state.lastPage > this.state.page ? (
-          <Button onClick={this.loadMore} />
-        ) : null}
-        {this.state.showModal && (
-          <Modal
-            onClose={this.closeModal}
-            largeImage={this.state.largeImageURL}
-          />
-        )}
-      </div>
-    );
-  }
-}
+      {pictures.length > 0 && lastPage > page && !error ? (
+        <Button onClick={loadMore} />
+      ) : null}
+      {modalShown && <Modal onClose={closeModal} largeImage={largeImageURL} />}
+    </div>
+  );
+};
